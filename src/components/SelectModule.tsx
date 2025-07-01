@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, CheckCircle2, Circle, Lock, Filter, Users, ArrowRight } from 'lucide-react';
+import { Clock, CheckCircle2, Circle, Lock, Filter, Users, ArrowRight, Lightbulb, Target, Plus } from 'lucide-react';
 
 interface Module {
   id: string;
@@ -15,6 +15,14 @@ interface Course {
   name: string;
   modules: Module[];
   isEvening: boolean;
+}
+
+interface Suggestion {
+  id: string;
+  modules: { courseId: string; moduleName: string; hours: number }[];
+  totalHours: number;
+  supportHours: number;
+  description: string;
 }
 
 type FilterType = 'all' | 'daytime' | 'evening';
@@ -100,6 +108,27 @@ export default function SelectModule({
     }));
   };
 
+  const applySuggestion = (suggestion: Suggestion) => {
+    // First clear all selections
+    setCourses(courses.map(course => ({
+      ...course,
+      modules: course.modules.map(module => ({ ...module, selected: false }))
+    })));
+
+    // Then apply the suggestion
+    setCourses(prevCourses => prevCourses.map(course => ({
+      ...course,
+      modules: course.modules.map(module => {
+        const suggestionModule = suggestion.modules.find(
+          sm => course.id === sm.courseId && module.name === sm.moduleName
+        );
+        return suggestionModule && module.available
+          ? { ...module, selected: true }
+          : { ...module, selected: false };
+      })
+    })));
+  };
+
   const clearSelection = () => {
     setCourses(courses.map(course => ({
       ...course,
@@ -118,6 +147,70 @@ export default function SelectModule({
       total + course.modules.filter(module => module.selected)
         .reduce((courseTotal, module) => courseTotal + module.hours, 0), 0
     );
+  };
+
+  const getAvailableModules = () => {
+    return courses.flatMap(course => 
+      course.modules
+        .filter(module => module.available && !module.selected)
+        .map(module => ({ ...module, courseId: course.id, courseName: course.name }))
+    );
+  };
+
+  const generateSuggestions = (): Suggestion[] => {
+    const currentHours = getTotalHours();
+    const hoursNeeded = 18 - currentHours;
+    const availableModules = getAvailableModules();
+    
+    if (hoursNeeded <= 0 || hoursNeeded >= 10) return [];
+
+    const suggestions: Suggestion[] = [];
+
+    // Generate combinations that get close to the needed hours
+    const findCombinations = (modules: any[], targetHours: number, maxModules: number = 3) => {
+      const combinations: any[][] = [];
+      
+      const backtrack = (start: number, current: any[], currentHours: number) => {
+        if (current.length <= maxModules && currentHours >= targetHours - 2 && currentHours <= targetHours + 1) {
+          combinations.push([...current]);
+        }
+        
+        if (current.length >= maxModules || currentHours > targetHours + 1) return;
+        
+        for (let i = start; i < modules.length; i++) {
+          current.push(modules[i]);
+          backtrack(i + 1, current, currentHours + modules[i].hours);
+          current.pop();
+        }
+      };
+      
+      backtrack(0, [], 0);
+      return combinations;
+    };
+
+    const combinations = findCombinations(availableModules, hoursNeeded);
+    
+    combinations.slice(0, 3).forEach((combo, index) => {
+      const totalModuleHours = combo.reduce((sum, module) => sum + module.hours, 0);
+      const finalTotal = currentHours + totalModuleHours;
+      const supportHours = Math.max(0, 18 - finalTotal);
+      
+      suggestions.push({
+        id: `suggestion-${index}`,
+        modules: combo.map(module => ({
+          courseId: module.courseId,
+          moduleName: module.name,
+          hours: module.hours
+        })),
+        totalHours: finalTotal,
+        supportHours,
+        description: combo.length === 1 
+          ? `Add ${combo[0].name} from ${combo[0].courseName}`
+          : `Combine ${combo.map(m => m.name).join(' + ')}`
+      });
+    });
+
+    return suggestions.filter(s => s.totalHours >= 16 && s.totalHours <= 19);
   };
 
   const getCourseColor = (courseId: string, isEvening: boolean) => {
@@ -170,6 +263,12 @@ export default function SelectModule({
   const filteredCourses = getFilteredCourses();
   const daytimeCourses = filteredCourses.filter(course => !course.isEvening);
   const eveningCourses = filteredCourses.filter(course => course.isEvening);
+
+  // Generate suggestions
+  const currentHours = getTotalHours();
+  const hoursRemaining = 18 - currentHours;
+  const suggestions = generateSuggestions();
+  const showSuggestions = hoursRemaining > 0 && hoursRemaining < 10 && suggestions.length > 0;
 
   // If it's not the user's turn, show waiting state
   if (!isYourTurn) {
@@ -354,7 +453,7 @@ export default function SelectModule({
               </span>
             </div>
             <p className="mt-1 text-sm text-gray-600">
-              Choose the modules you would like to teach this academic year
+              Choose the modules you would like to teach this academic year (18-21 hours required)
             </p>
           </div>
           <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-6">
@@ -375,9 +474,14 @@ export default function SelectModule({
               <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
               <span className="font-medium">{getSelectedModulesCount()}</span> modules selected
             </div>
-            <div className="flex items-center text-sm text-gray-600">
+            <div className="flex items-center text-sm">
               <Clock className="h-4 w-4 mr-2 text-blue-500" />
-              <span className="font-medium">{getTotalHours()}</span> total hours
+              <span className={`font-medium ${
+                currentHours < 18 ? 'text-orange-600' : 
+                currentHours > 21 ? 'text-red-600' : 'text-green-600'
+              }`}>
+                {currentHours}/18-21 hours
+              </span>
             </div>
           </div>
         </div>
@@ -386,7 +490,86 @@ export default function SelectModule({
             Showing {filteredCourses.length} of {courses.length} courses ({filter} only)
           </div>
         )}
+        
+        {/* Hours Status */}
+        {currentHours > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600">Progress to minimum requirement</span>
+              <span className={`font-medium ${
+                currentHours < 18 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {currentHours >= 18 ? 'Requirement met!' : `${hoursRemaining} hours remaining`}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  currentHours < 18 ? 'bg-orange-500' : 
+                  currentHours > 21 ? 'bg-red-500' : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min((currentHours / 21) * 100, 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Suggestions Section */}
+      {showSuggestions && (
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg shadow-sm p-6 border border-amber-200">
+          <div className="flex items-center mb-4">
+            <Lightbulb className="h-6 w-6 text-amber-600 mr-3" />
+            <h3 className="text-lg font-semibold text-gray-900">Suggested Combinations</h3>
+            <span className="ml-3 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
+              {hoursRemaining} hours needed
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 mb-6">
+            Here are some combinations that would help you reach the 18-hour minimum requirement:
+          </p>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {suggestions.map((suggestion) => (
+              <div
+                key={suggestion.id}
+                className="bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all duration-200"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <Target className="h-4 w-4 text-green-600 mr-2" />
+                    <span className="font-medium text-gray-900">
+                      {suggestion.totalHours} hours total
+                    </span>
+                  </div>
+                  {suggestion.supportHours > 0 && (
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      +{suggestion.supportHours}h support
+                    </span>
+                  )}
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  {suggestion.modules.map((module, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{module.moduleName}</span>
+                      <span className="text-gray-500 font-medium">{module.hours}h</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => applySuggestion(suggestion)}
+                  className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-md hover:bg-amber-200 transition-colors duration-200"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Apply This Combination
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Course Groups */}
       {filter === 'all' || filter === 'daytime' ? (
@@ -422,7 +605,16 @@ export default function SelectModule({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
             <div className="text-sm text-gray-600">
               You have selected <span className="font-medium text-gray-900">{getSelectedModulesCount()} modules</span> 
-              {' '}totaling <span className="font-medium text-gray-900">{getTotalHours()} hours</span>
+              {' '}totaling <span className={`font-medium ${
+                currentHours < 18 ? 'text-orange-600' : 
+                currentHours > 21 ? 'text-red-600' : 'text-green-600'
+              }`}>{currentHours} hours</span>
+              {currentHours < 18 && (
+                <span className="text-orange-600"> ({hoursRemaining} hours short of minimum)</span>
+              )}
+              {currentHours > 21 && (
+                <span className="text-red-600"> ({currentHours - 21} hours over maximum)</span>
+              )}
             </div>
             <div className="flex space-x-3">
               <button 
@@ -431,7 +623,14 @@ export default function SelectModule({
               >
                 Clear Selection
               </button>
-              <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors duration-200">
+              <button 
+                disabled={currentHours < 18 || currentHours > 21}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                  currentHours >= 18 && currentHours <= 21
+                    ? 'text-white bg-blue-600 border border-transparent hover:bg-blue-700'
+                    : 'text-gray-400 bg-gray-100 border border-gray-300 cursor-not-allowed'
+                }`}
+              >
                 Save Selection
               </button>
             </div>
