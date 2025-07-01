@@ -59,7 +59,7 @@ export default function SelectModule({
       modules: [
         { id: 'data-access-2m', name: 'Data Access', hours: 7, selected: false, available: true },
         { id: 'pmdm-2m', name: 'PMDM', hours: 5, selected: false, available: true },
-        { id: 'systems-2m', name: 'Systems', hours: 6, selected: false, available: false, assignedTo: 'Prof. Martínez' },
+        { id: 'systems-2m', name: 'Systems', hours: 2, selected: false, available: false, assignedTo: 'Prof. Martínez' },
       ],
     },
     {
@@ -68,7 +68,7 @@ export default function SelectModule({
       isEvening: false,
       modules: [
         { id: 'web-dev-1fq', name: 'Web Development', hours: 8, selected: false, available: true },
-        { id: 'networks-1fq', name: 'Networks', hours: 5, selected: false, available: true },
+        { id: 'networks-1fq', name: 'Networks', hours: 3, selected: false, available: true },
       ],
     },
     {
@@ -87,7 +87,7 @@ export default function SelectModule({
       isEvening: true,
       modules: [
         { id: 'data-access-2mv', name: 'Data Access', hours: 7, selected: false, available: false, assignedTo: 'Prof. Rodríguez' },
-        { id: 'pmdm-2mv', name: 'PMDM', hours: 5, selected: false, available: true },
+        { id: 'pmdm-2mv', name: 'PMDM', hours: 2, selected: false, available: true },
       ],
     },
   ]);
