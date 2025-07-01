@@ -18,7 +18,7 @@ export default function Layout({ children, currentPage, onPageChange, userRole =
 
   // Add Control Panel for admin users
   if (userRole === 'admin') {
-    menuItems.splice(3, 0, { id: 'control-panel', label: 'Control Panel', icon: Shield });
+    menuItems.splice(0, 0, { id: 'control-panel', label: 'Control Panel', icon: Shield });
   }
 
   return (
