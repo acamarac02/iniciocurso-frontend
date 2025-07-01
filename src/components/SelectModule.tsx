@@ -35,7 +35,7 @@ interface SelectModuleProps {
 }
 
 export default function SelectModule({ 
-  isYourTurn = false, 
+  isYourTurn = true, 
   currentChooser = "Prof. Ana López",
   peopleAhead = 3,
   onNavigateToSelectionOrder
