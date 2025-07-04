@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Settings, 
   Upload, 
@@ -17,7 +17,11 @@ import {
   User,
   Database,
   ArrowLeftRight,
-  ListOrdered
+  ListOrdered,
+  X,
+  Save,
+  Trash2,
+  Plus
 } from 'lucide-react';
 
 interface Teacher {
@@ -27,6 +31,14 @@ interface Teacher {
   seniority: number;
   position: number;
   status: 'completed' | 'in-progress' | 'waiting';
+  assignedModules: AssignedModule[];
+}
+
+interface AssignedModule {
+  id: string;
+  name: string;
+  course: string;
+  hours: number;
 }
 
 interface AssignmentStatus {
@@ -36,19 +48,23 @@ interface AssignmentStatus {
   completedAt?: string;
   totalTeachers: number;
   completedTeachers: number;
+  mode?: 'wheel' | 'block';
 }
 
 type MenuItem = 'assignment-management' | 'data-upload' | 'swap-modules' | 'edit-assigned' | 'selection-order';
 
 export default function ControlPanel() {
   const [activeMenuItem, setActiveMenuItem] = useState<MenuItem>('assignment-management');
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [showSaveButton, setShowSaveButton] = useState(false);
   
   const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus>({
     isStarted: true,
     isCompleted: false,
     startedAt: new Date().toISOString(),
     totalTeachers: 7,
-    completedTeachers: 2
+    completedTeachers: 2,
+    mode: 'wheel'
   });
 
   const [teachers, setTeachers] = useState<Teacher[]>([
@@ -58,7 +74,12 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 15,
       position: 1,
-      status: 'completed'
+      status: 'completed',
+      assignedModules: [
+        { id: 'm1', name: 'Programming', course: '1M', hours: 7 },
+        { id: 'm2', name: 'Databases', course: '1M', hours: 6 },
+        { id: 'm3', name: 'Web Development', course: '1FQ', hours: 5 }
+      ]
     },
     {
       id: '2',
@@ -66,7 +87,12 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 12,
       position: 2,
-      status: 'completed'
+      status: 'completed',
+      assignedModules: [
+        { id: 'm4', name: 'Operating Systems', course: '1M', hours: 5 },
+        { id: 'm5', name: 'Networks', course: '1FQ', hours: 8 },
+        { id: 'm6', name: 'Systems Management', course: '2M', hours: 5 }
+      ]
     },
     {
       id: '3',
@@ -74,7 +100,8 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 10,
       position: 3,
-      status: 'in-progress'
+      status: 'in-progress',
+      assignedModules: []
     },
     {
       id: '4',
@@ -82,7 +109,8 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 8,
       position: 4,
-      status: 'waiting'
+      status: 'waiting',
+      assignedModules: []
     },
     {
       id: '5',
@@ -90,7 +118,8 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 6,
       position: 5,
-      status: 'waiting'
+      status: 'waiting',
+      assignedModules: []
     },
     {
       id: '6',
@@ -98,7 +127,8 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 4,
       position: 6,
-      status: 'waiting'
+      status: 'waiting',
+      assignedModules: []
     },
     {
       id: '7',
@@ -106,14 +136,30 @@ export default function ControlPanel() {
       department: 'Computer Science',
       seniority: 3,
       position: 7,
-      status: 'waiting'
+      status: 'waiting',
+      assignedModules: []
     }
   ]);
 
+  const [availableModules] = useState<AssignedModule[]>([
+    { id: 'am1', name: 'Data Access', course: '2M', hours: 7 },
+    { id: 'am2', name: 'Mobile Development', course: '2M', hours: 5 },
+    { id: 'am3', name: 'User Interfaces', course: '2M', hours: 4 },
+    { id: 'am4', name: 'Markup Languages', course: '1M', hours: 4 },
+    { id: 'am5', name: 'Computer Hardware', course: '1FQ', hours: 6 }
+  ]);
+
   const [draggedTeacher, setDraggedTeacher] = useState<string | null>(null);
+  const [originalTeacherOrder, setOriginalTeacherOrder] = useState<Teacher[]>([]);
   const [selectedTeacherForEdit, setSelectedTeacherForEdit] = useState<string>('');
   const [selectedTeacher1ForSwap, setSelectedTeacher1ForSwap] = useState<string>('');
   const [selectedTeacher2ForSwap, setSelectedTeacher2ForSwap] = useState<string>('');
+  const [selectedModule1ForSwap, setSelectedModule1ForSwap] = useState<string>('');
+  const [selectedModule2ForSwap, setSelectedModule2ForSwap] = useState<string>('');
+
+  // File input refs
+  const moduleFileInputRef = useRef<HTMLInputElement>(null);
+  const teacherFileInputRef = useRef<HTMLInputElement>(null);
 
   const menuItems = [
     {
@@ -148,12 +194,14 @@ export default function ControlPanel() {
     }
   ];
 
-  const handleStartAssignment = () => {
+  const handleStartAssignment = (mode: 'wheel' | 'block') => {
     setAssignmentStatus({
       ...assignmentStatus,
       isStarted: true,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      mode
     });
+    setShowStartModal(false);
   };
 
   const handleFinishAssignment = () => {
@@ -164,9 +212,80 @@ export default function ControlPanel() {
     });
   };
 
+  const handleFileSelect = (type: 'modules' | 'teachers') => {
+    if (type === 'modules') {
+      moduleFileInputRef.current?.click();
+    } else {
+      teacherFileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'modules' | 'teachers') => {
+    const file = event.target.files?.[0];
+    if (file) {
+      console.log(`Selected ${type} file:`, file.name);
+      // Here you would handle the file upload
+    }
+  };
+
+  const handleSwapModules = () => {
+    if (!selectedTeacher1ForSwap || !selectedTeacher2ForSwap || !selectedModule1ForSwap || !selectedModule2ForSwap) {
+      return;
+    }
+
+    setTeachers(prevTeachers => prevTeachers.map(teacher => {
+      if (teacher.id === selectedTeacher1ForSwap) {
+        const newModules = teacher.assignedModules.map(module => 
+          module.id === selectedModule1ForSwap 
+            ? teachers.find(t => t.id === selectedTeacher2ForSwap)?.assignedModules.find(m => m.id === selectedModule2ForSwap)!
+            : module
+        );
+        return { ...teacher, assignedModules: newModules };
+      } else if (teacher.id === selectedTeacher2ForSwap) {
+        const newModules = teacher.assignedModules.map(module => 
+          module.id === selectedModule2ForSwap 
+            ? teachers.find(t => t.id === selectedTeacher1ForSwap)?.assignedModules.find(m => m.id === selectedModule1ForSwap)!
+            : module
+        );
+        return { ...teacher, assignedModules: newModules };
+      }
+      return teacher;
+    }));
+
+    // Reset selections
+    setSelectedTeacher1ForSwap('');
+    setSelectedTeacher2ForSwap('');
+    setSelectedModule1ForSwap('');
+    setSelectedModule2ForSwap('');
+  };
+
+  const handleRemoveModule = (teacherId: string, moduleId: string) => {
+    setTeachers(prevTeachers => prevTeachers.map(teacher => 
+      teacher.id === teacherId 
+        ? { ...teacher, assignedModules: teacher.assignedModules.filter(m => m.id !== moduleId) }
+        : teacher
+    ));
+  };
+
+  const handleAddModule = (teacherId: string, moduleId: string) => {
+    const moduleToAdd = availableModules.find(m => m.id === moduleId);
+    if (!moduleToAdd) return;
+
+    setTeachers(prevTeachers => prevTeachers.map(teacher => 
+      teacher.id === teacherId 
+        ? { ...teacher, assignedModules: [...teacher.assignedModules, moduleToAdd] }
+        : teacher
+    ));
+  };
+
   const handleDragStart = (e: React.DragEvent, teacherId: string) => {
     setDraggedTeacher(teacherId);
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Store original order when drag starts
+    if (originalTeacherOrder.length === 0) {
+      setOriginalTeacherOrder([...teachers]);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -199,6 +318,19 @@ export default function ControlPanel() {
 
     setTeachers(updatedTeachers);
     setDraggedTeacher(null);
+    setShowSaveButton(true);
+  };
+
+  const handleSaveOrder = () => {
+    setOriginalTeacherOrder([]);
+    setShowSaveButton(false);
+    // Here you would save to backend
+  };
+
+  const handleCancelOrder = () => {
+    setTeachers(originalTeacherOrder);
+    setOriginalTeacherOrder([]);
+    setShowSaveButton(false);
   };
 
   const getStatusIcon = (status: string) => {
@@ -223,6 +355,66 @@ export default function ControlPanel() {
     }
   };
 
+  const getTeacher1Modules = () => {
+    return teachers.find(t => t.id === selectedTeacher1ForSwap)?.assignedModules || [];
+  };
+
+  const getTeacher2Modules = () => {
+    return teachers.find(t => t.id === selectedTeacher2ForSwap)?.assignedModules || [];
+  };
+
+  const getSelectedTeacherModules = () => {
+    return teachers.find(t => t.id === selectedTeacherForEdit)?.assignedModules || [];
+  };
+
+  const getAvailableModulesForTeacher = () => {
+    const assignedModuleIds = teachers.flatMap(t => t.assignedModules.map(m => m.id));
+    return availableModules.filter(m => !assignedModuleIds.includes(m.id));
+  };
+
+  // Start Assignment Modal
+  const StartAssignmentModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Start Assignment Process</h3>
+          <button
+            onClick={() => setShowStartModal(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        
+        <p className="text-sm text-gray-600 mb-6">
+          Choose the assignment mode for the module selection process:
+        </p>
+        
+        <div className="space-y-4">
+          <button
+            onClick={() => handleStartAssignment('wheel')}
+            className="w-full p-4 text-left border-2 border-blue-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200"
+          >
+            <div className="font-medium text-gray-900">Wheel Mode</div>
+            <div className="text-sm text-gray-600 mt-1">
+              Teachers select modules in rotating order based on seniority
+            </div>
+          </button>
+          
+          <button
+            onClick={() => handleStartAssignment('block')}
+            className="w-full p-4 text-left border-2 border-green-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors duration-200"
+          >
+            <div className="font-medium text-gray-900">Block Mode</div>
+            <div className="text-sm text-gray-600 mt-1">
+              Teachers select all their modules at once in order of seniority
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderAssignmentManagement = () => (
     <div className="space-y-6">
       {/* Assignment Status */}
@@ -244,7 +436,7 @@ export default function ControlPanel() {
             ) : assignmentStatus.isStarted ? (
               <>
                 <Clock className="h-4 w-4 animate-pulse" />
-                <span>In Progress</span>
+                <span>In Progress ({assignmentStatus.mode?.toUpperCase()})</span>
               </>
             ) : (
               <>
@@ -278,7 +470,7 @@ export default function ControlPanel() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={handleStartAssignment}
+            onClick={() => setShowStartModal(true)}
             disabled={assignmentStatus.isStarted}
             className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
               assignmentStatus.isStarted
@@ -394,10 +586,12 @@ export default function ControlPanel() {
             <p className="text-xs text-gray-600 mb-4">
               Excel file (.xlsx) with module information including course codes, names, hours, and requirements
             </p>
-            <button className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 transition-colors duration-200">
+            <button 
+              onClick={() => handleFileSelect('modules')}
+              className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 transition-colors duration-200"
+            >
               Choose Excel File
             </button>
-            <p className="text-xs text-gray-500 mt-3">Coming Soon</p>
           </div>
           
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -420,10 +614,12 @@ export default function ControlPanel() {
             <p className="text-xs text-gray-600 mb-4">
               Excel file (.xlsx) with teacher information including names, departments, seniority, and specializations
             </p>
-            <button className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-300 rounded-md hover:bg-green-100 transition-colors duration-200">
+            <button 
+              onClick={() => handleFileSelect('teachers')}
+              className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-300 rounded-md hover:bg-green-100 transition-colors duration-200"
+            >
               Choose Excel File
             </button>
-            <p className="text-xs text-gray-500 mt-3">Coming Soon</p>
           </div>
           
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -443,6 +639,22 @@ export default function ControlPanel() {
           <p className="text-xs text-gray-500 mt-1">Upload history will appear here</p>
         </div>
       </div>
+
+      {/* Hidden file inputs */}
+      <input
+        ref={moduleFileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={(e) => handleFileChange(e, 'modules')}
+        className="hidden"
+      />
+      <input
+        ref={teacherFileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={(e) => handleFileChange(e, 'teachers')}
+        className="hidden"
+      />
     </div>
   );
 
@@ -460,23 +672,34 @@ export default function ControlPanel() {
               <label className="block text-sm font-medium text-gray-700 mb-2">First Teacher</label>
               <select 
                 value={selectedTeacher1ForSwap}
-                onChange={(e) => setSelectedTeacher1ForSwap(e.target.value)}
+                onChange={(e) => {
+                  setSelectedTeacher1ForSwap(e.target.value);
+                  setSelectedModule1ForSwap('');
+                }}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
                 <option value="">Select first teacher...</option>
-                {teachers.filter(t => t.status === 'completed').map(teacher => (
+                {teachers.filter(t => t.status === 'completed' && t.assignedModules.length > 0).map(teacher => (
                   <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
                 ))}
               </select>
             </div>
             
             {selectedTeacher1ForSwap && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-900 mb-2">Current Modules:</p>
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-600 p-2 bg-white rounded border">Programming (7h)</div>
-                  <div className="text-xs text-gray-600 p-2 bg-white rounded border">Databases (6h)</div>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Module</label>
+                <select 
+                  value={selectedModule1ForSwap}
+                  onChange={(e) => setSelectedModule1ForSwap(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="">Select module...</option>
+                  {getTeacher1Modules().map(module => (
+                    <option key={module.id} value={module.id}>
+                      {module.name} ({module.course}) - {module.hours}h
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -486,23 +709,34 @@ export default function ControlPanel() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Second Teacher</label>
               <select 
                 value={selectedTeacher2ForSwap}
-                onChange={(e) => setSelectedTeacher2ForSwap(e.target.value)}
+                onChange={(e) => {
+                  setSelectedTeacher2ForSwap(e.target.value);
+                  setSelectedModule2ForSwap('');
+                }}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
                 <option value="">Select second teacher...</option>
-                {teachers.filter(t => t.status === 'completed' && t.id !== selectedTeacher1ForSwap).map(teacher => (
+                {teachers.filter(t => t.status === 'completed' && t.id !== selectedTeacher1ForSwap && t.assignedModules.length > 0).map(teacher => (
                   <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
                 ))}
               </select>
             </div>
             
             {selectedTeacher2ForSwap && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-900 mb-2">Current Modules:</p>
-                <div className="space-y-1">
-                  <div className="text-xs text-gray-600 p-2 bg-white rounded border">Operating Systems (5h)</div>
-                  <div className="text-xs text-gray-600 p-2 bg-white rounded border">Networks (8h)</div>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Module</label>
+                <select 
+                  value={selectedModule2ForSwap}
+                  onChange={(e) => setSelectedModule2ForSwap(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="">Select module...</option>
+                  {getTeacher2Modules().map(module => (
+                    <option key={module.id} value={module.id}>
+                      {module.name} ({module.course}) - {module.hours}h
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -510,18 +744,13 @@ export default function ControlPanel() {
         
         <div className="mt-6 flex justify-center">
           <button 
-            disabled={!selectedTeacher1ForSwap || !selectedTeacher2ForSwap}
+            onClick={handleSwapModules}
+            disabled={!selectedTeacher1ForSwap || !selectedTeacher2ForSwap || !selectedModule1ForSwap || !selectedModule2ForSwap}
             className="flex items-center px-6 py-3 text-sm font-medium text-orange-600 bg-orange-50 border border-orange-300 rounded-md hover:bg-orange-100 transition-colors duration-200 disabled:text-gray-400 disabled:bg-gray-100 disabled:border-gray-300 disabled:cursor-not-allowed"
           >
             <ArrowLeftRight className="h-4 w-4 mr-2" />
-            Swap All Modules
+            Swap Selected Modules
           </button>
-        </div>
-        
-        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800">
-            <strong>Coming Soon:</strong> This feature will allow you to swap modules between teachers who have already completed their selection.
-          </p>
         </div>
       </div>
     </div>
@@ -555,37 +784,31 @@ export default function ControlPanel() {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Current Assignments</h4>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-white rounded border">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Programming</div>
-                      <div className="text-xs text-gray-600">Course 1M • 7 hours</div>
+                  {getSelectedTeacherModules().map(module => (
+                    <div key={module.id} className="flex items-center justify-between p-3 bg-white rounded border">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{module.name}</div>
+                        <div className="text-xs text-gray-600">{module.course} • {module.hours} hours</div>
+                      </div>
+                      <button 
+                        onClick={() => handleRemoveModule(selectedTeacherForEdit, module.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded border">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Databases</div>
-                      <div className="text-xs text-gray-600">Course 1M • 6 hours</div>
+                  ))}
+                  {getSelectedTeacherModules().length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No modules assigned
                     </div>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded border">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Web Development</div>
-                      <div className="text-xs text-gray-600">Course 1FQ • 5 hours</div>
-                    </div>
-                    <button className="text-red-600 hover:text-red-700">
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  )}
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <div className="text-sm text-gray-600">
-                    Total: <span className="font-medium text-gray-900">18 hours</span>
+                    Total: <span className="font-medium text-gray-900">
+                      {getSelectedTeacherModules().reduce((sum, m) => sum + m.hours, 0)} hours
+                    </span>
                   </div>
                 </div>
               </div>
@@ -593,34 +816,29 @@ export default function ControlPanel() {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Available Modules</h4>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-white rounded border border-dashed">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Data Access</div>
-                      <div className="text-xs text-gray-600">Course 2M • 7 hours</div>
+                  {getAvailableModulesForTeacher().map(module => (
+                    <div key={module.id} className="flex items-center justify-between p-3 bg-white rounded border border-dashed">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{module.name}</div>
+                        <div className="text-xs text-gray-600">{module.course} • {module.hours} hours</div>
+                      </div>
+                      <button 
+                        onClick={() => handleAddModule(selectedTeacherForEdit, module.id)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button className="text-green-600 hover:text-green-700">
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded border border-dashed">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Mobile Development</div>
-                      <div className="text-xs text-gray-600">Course 2M • 5 hours</div>
+                  ))}
+                  {getAvailableModulesForTeacher().length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No available modules
                     </div>
-                    <button className="text-green-600 hover:text-green-700">
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
-        </div>
-        
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Coming Soon:</strong> This feature will allow you to modify module assignments for teachers who have completed their selection.
-          </p>
         </div>
       </div>
     </div>
@@ -637,11 +855,30 @@ export default function ControlPanel() {
                 <h3 className="text-lg font-semibold text-gray-900">Edit Selection Order</h3>
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Drag and drop to reorder teachers (Coming Soon)
+                Drag and drop to reorder teachers
               </p>
             </div>
-            <div className="text-sm text-gray-500">
-              {teachers.length} teachers
+            <div className="flex items-center space-x-3">
+              {showSaveButton && (
+                <>
+                  <button
+                    onClick={handleCancelOrder}
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveOrder}
+                    className="flex items-center px-3 py-1 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 transition-colors duration-200"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Save Order
+                  </button>
+                </>
+              )}
+              <div className="text-sm text-gray-500">
+                {teachers.length} teachers
+              </div>
             </div>
           </div>
         </div>
@@ -687,14 +924,6 @@ export default function ControlPanel() {
               </div>
             </div>
           ))}
-        </div>
-        
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
-              <strong>Coming Soon:</strong> Drag and drop functionality to reorder teacher selection priority will be available here.
-            </p>
-          </div>
         </div>
       </div>
     </div>
@@ -796,6 +1025,9 @@ export default function ControlPanel() {
       <div className="flex-1 p-8">
         {renderContent()}
       </div>
+
+      {/* Start Assignment Modal */}
+      {showStartModal && <StartAssignmentModal />}
     </div>
   );
 }
