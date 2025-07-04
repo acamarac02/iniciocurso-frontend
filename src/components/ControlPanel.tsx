@@ -197,7 +197,7 @@ export default function ControlPanel() {
   const handleStartAssignment = (mode: 'wheel' | 'block') => {
     setAssignmentStatus({
       ...assignmentStatus,
-      isStarted: true,
+      isStarted: false,
       startedAt: new Date().toISOString(),
       mode
     });
