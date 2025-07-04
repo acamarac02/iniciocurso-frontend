@@ -59,7 +59,7 @@ export default function ControlPanel() {
   const [showSaveButton, setShowSaveButton] = useState(false);
   
   const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus>({
-    isStarted: true,
+    isStarted: false,
     isCompleted: false,
     startedAt: new Date().toISOString(),
     totalTeachers: 7,
