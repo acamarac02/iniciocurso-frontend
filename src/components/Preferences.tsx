@@ -417,7 +417,7 @@ export default function Preferences() {
           <div className="space-y-4">
             <div className="flex items-center">
               <input
-                type="radio"
+                type="checkbox"
                 id="regular-duty"
                 name="duty"
                 value="regular"
@@ -433,7 +433,7 @@ export default function Preferences() {
             
             <div className="flex items-center">
               <input
-                type="radio"
+                type="checkbox"
                 id="recess-duty"
                 name="duty"
                 value="recess"
