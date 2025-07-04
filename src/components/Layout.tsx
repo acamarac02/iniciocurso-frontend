@@ -1,14 +1,15 @@
 import React from 'react';
-import { User, BookOpen, BarChart3, Settings, Users, Shield } from 'lucide-react';
+import { User, BookOpen, BarChart3, Settings, Users, Shield, LogOut } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
   userRole?: 'teacher' | 'admin';
+  onLogout?: () => void;
 }
 
-export default function Layout({ children, currentPage, onPageChange, userRole = 'admin' }: LayoutProps) {
+export default function Layout({ children, currentPage, onPageChange, userRole = 'teacher', onLogout }: LayoutProps) {
   const menuItems = [
     { id: 'select-module', label: 'Select Module', icon: BookOpen },
     { id: 'module-summary', label: 'Module Summary', icon: BarChart3 },
@@ -31,7 +32,7 @@ export default function Layout({ children, currentPage, onPageChange, userRole =
               <BookOpen className="h-8 w-8 text-blue-600" />
               <h1 className="ml-3 text-xl font-semibold text-gray-900">Module Assignment</h1>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <div className="flex items-center text-sm text-gray-600">
                 <User className="h-4 w-4 mr-2" />
                 {userRole === 'admin' ? 'Department Head' : 'Teacher Dashboard'}
@@ -41,6 +42,15 @@ export default function Layout({ children, currentPage, onPageChange, userRole =
                   </span>
                 )}
               </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors duration-200"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Logout
+                </button>
+              )}
             </div>
           </div>
         </div>
