@@ -318,8 +318,7 @@ export default function Preferences() {
             <table className="w-full border border-gray-200 rounded-lg">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-200">Role</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-200">Program Responsibility</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-200">Role, Program Responsibility, etc.</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border-b border-gray-200">Reduction Hours</th>
                 </tr>
               </thead>
@@ -331,16 +330,7 @@ export default function Preferences() {
                         type="text"
                         value={role.role}
                         onChange={(e) => handleResponsibilityChange(index, 'role', e.target.value)}
-                        placeholder="e.g., Department Coordinator"
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        value={role.programResponsibility}
-                        onChange={(e) => handleResponsibilityChange(index, 'programResponsibility', e.target.value)}
-                        placeholder="e.g., Curriculum Development"
+                        placeholder="e.g., Department Coordinator, Curriculum Development, Quality Assurance..."
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                       />
                     </td>
@@ -417,7 +407,7 @@ export default function Preferences() {
           <div className="space-y-4">
             <div className="flex items-center">
               <input
-                type="checkbox"
+                type="radio"
                 id="regular-duty"
                 name="duty"
                 value="regular"
@@ -433,7 +423,7 @@ export default function Preferences() {
             
             <div className="flex items-center">
               <input
-                type="checkbox"
+                type="radio"
                 id="recess-duty"
                 name="duty"
                 value="recess"
